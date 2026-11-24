@@ -66,6 +66,17 @@ export default function SettingsEditor({ initial }: { initial: Settings }) {
           チーム名（予約ページの上に表示）
           <input value={s.teamName} onChange={(e) => up((d) => void (d.teamName = e.target.value))} />
         </label>
+        <div className="menu-form" style={{ padding: "12px 0 0" }}>
+          <label className="field">
+            担当者名（予約ページに表示）
+            <input value={s.hostName} placeholder="例：松本" onChange={(e) => up((d) => void (d.hostName = e.target.value))} />
+          </label>
+          <label className="field">
+            担当者のメールアドレス
+            <input type="email" value={s.hostEmail} placeholder="例：matsumoto@example.com" onChange={(e) => up((d) => void (d.hostEmail = e.target.value))} />
+          </label>
+        </div>
+        <p className="muted small">メールアドレスを入れると、予約が入るたびに担当者にもGoogleカレンダーの招待が届き、担当者のカレンダーに予定が入ります。担当者のカレンダーが連携アカウントに共有されていれば、その予定がある時間も予約できなくなります。</p>
       </section>
 
       <section className="card pad">

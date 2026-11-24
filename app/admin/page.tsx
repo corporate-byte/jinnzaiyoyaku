@@ -118,6 +118,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
 
       <section className="card pad">
         <h2>現在の設定</h2>
+        <h3>担当者</h3>
+        <p>{config.hostName || <span className="muted">未設定</span>}{config.hostEmail && <span className="muted">（{config.hostEmail}）</span>}</p>
         <h3>受付時間</h3>
         <ul className="hours">
           {[1, 2, 3, 4, 5, 6, 0].map((w) => {

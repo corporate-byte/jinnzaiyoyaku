@@ -7,6 +7,8 @@ export type Menu = EventType & { active: boolean };
 export type Hours = Record<Weekday, { start: string; end: string }[]>;
 export type Settings = {
   teamName: string;
+  hostName: string;
+  hostEmail: string;
   timeZone: string;
   weeklyHours: Hours;
   blockedDates: string[];
@@ -18,6 +20,8 @@ const g = globalThis as unknown as { __settings?: Settings; __settingsCache?: { 
 function fromDefaults(): Settings {
   return {
     teamName: defaults.teamName,
+    hostName: defaults.hostName,
+    hostEmail: defaults.hostEmail,
     timeZone: defaults.timeZone,
     weeklyHours: structuredClone(defaults.weeklyHours),
     blockedDates: [...defaults.blockedDates],
@@ -30,7 +34,7 @@ export async function getSettings(): Promise<Settings> {
   const c = g.__settingsCache;
   if (c && Date.now() - c.at < 5000) return c.v; // 同じリクエスト内の多重読み込みを避ける短いキャッシュ
   const v = await rpc<Settings | null>("booking_get_settings");
-  const s = v && v.eventTypes ? v : fromDefaults();
+  const s = v && v.eventTypes ? { ...v, hostName: v.hostName ?? "", hostEmail: v.hostEmail ?? "" } : fromDefaults();
   g.__settingsCache = { at: Date.now(), v: s };
   return s;
 }
@@ -127,8 +131,12 @@ export function validateSettings(input: unknown): Settings {
       active: raw.active !== false,
     };
   });
+  const hostEmail = String(x.hostEmail ?? "").trim();
+  if (hostEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(hostEmail)) throw new Error("担当者のメールアドレスが正しくありません");
   return {
     teamName: str(x.teamName, 100, "チーム名"),
+    hostName: str(x.hostName, 50, "担当者名", false),
+    hostEmail: hostEmail.slice(0, 200),
     timeZone: "Asia/Tokyo",
     weeklyHours,
     blockedDates,

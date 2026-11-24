@@ -45,19 +45,23 @@ const mockEvents = (g.__mockEvents ??= []);
 
 // ---------- 公開関数 ----------
 
-export async function getBusy(calendars: string[], timeMin: Date, timeMax: Date): Promise<Interval[]> {
+/** optional に入れたカレンダーは、見られなくてもエラーにしない（担当者のカレンダーなど） */
+export async function getBusy(calendars: string[], timeMin: Date, timeMax: Date, optional: string[] = []): Promise<Interval[]> {
   if (isMock()) {
     return mockEvents.filter((e) => e.end > timeMin && e.start < timeMax).map((e) => ({ start: e.start, end: e.end }));
   }
   const res = await gfetch("/freeBusy", {
     method: "POST",
-    body: JSON.stringify({ timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), items: calendars.map((id) => ({ id })) }),
+    body: JSON.stringify({ timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), items: [...new Set([...calendars, ...optional])].map((id) => ({ id })) }),
   });
   if (!res.ok) throw new Error(`freeBusy failed: ${res.status} ${await res.text()}`);
   const j = await res.json();
   const out: Interval[] = [];
-  for (const cal of Object.values(j.calendars ?? {}) as { busy?: { start: string; end: string }[]; errors?: unknown[] }[]) {
-    if (cal.errors?.length) throw new Error(`freeBusy calendar error: ${JSON.stringify(cal.errors)}`);
+  for (const [id, cal] of Object.entries(j.calendars ?? {}) as [string, { busy?: { start: string; end: string }[]; errors?: unknown[] }][]) {
+    if (cal.errors?.length) {
+      if (optional.includes(id) && !calendars.includes(id)) continue; // 共有されていない担当者カレンダーは無視
+      throw new Error(`freeBusy calendar error: ${JSON.stringify(cal.errors)}`);
+    }
     for (const b of cal.busy ?? []) out.push({ start: new Date(b.start), end: new Date(b.end) });
   }
   return out;
@@ -74,6 +78,7 @@ export async function createEvent(input: {
   end: Date;
   timeZone: string;
   attendee: { email: string; name: string };
+  extraAttendees?: { email: string; name: string }[]; // 担当者など
   googleMeet: boolean;
   location?: string;
   meta: Record<string, string>; // 管理画面用の予約情報（イベントの非公開プロパティに保存）
@@ -91,7 +96,7 @@ export async function createEvent(input: {
     description: input.description,
     start: { dateTime: input.start.toISOString(), timeZone: input.timeZone },
     end: { dateTime: input.end.toISOString(), timeZone: input.timeZone },
-    attendees: [{ email: input.attendee.email, displayName: input.attendee.name }],
+    attendees: [input.attendee, ...(input.extraAttendees ?? [])].map((a) => ({ email: a.email, displayName: a.name })),
     reminders: { useDefault: true },
     extendedProperties: { private: { bookingApp: "1", ...input.meta } },
   };

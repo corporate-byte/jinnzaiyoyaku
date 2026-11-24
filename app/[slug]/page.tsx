@@ -17,6 +17,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           <p className="muted small">{config.teamName}</p>
           <h1 style={{ color: ev.color }}>{ev.name}</h1>
           <ul className="meta">
+            {config.hostName && <li>👤 担当：{config.hostName}</li>}
             <li>🕒 {ev.durationMinutes}分</li>
             <li>📍 {locationLabel}</li>
             <li>🌏 日本時間 ({config.timeZone})</li>

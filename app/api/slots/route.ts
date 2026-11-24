@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       config.busyCalendars,
       zonedToUtc(addDays(from, -1), "00:00", s.timeZone),
       zonedToUtc(addDays(to, 2), "00:00", s.timeZone),
+      s.hostEmail ? [s.hostEmail] : [],
     );
     return NextResponse.json({ timeZone: s.timeZone, slots: computeSlots(ev, rulesOf(s), busy, from, to) });
   } catch (e) {

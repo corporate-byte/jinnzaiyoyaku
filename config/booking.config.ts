@@ -24,7 +24,8 @@ export type EventType = {
 
 export const config = {
   teamName: "求職者送客の窓口",
-  hostName: "担当者",
+  hostName: "松本",
+  hostEmail: "", // 担当者のメールアドレス（予約の招待を送る）
   timeZone: "Asia/Tokyo",
   // 空き時間の判定に使うGoogleカレンダー（"primary" = 連携したアカウントのメインカレンダー）
   busyCalendars: ["primary"],

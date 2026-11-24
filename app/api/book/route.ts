@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const end = new Date(start.getTime() + ev.durationMinutes * 60000);
   try {
     const pad = Math.max(ev.bufferBeforeMinutes, ev.bufferAfterMinutes) * 60000 + 3600000;
-    const busy = await getBusy(config.busyCalendars, new Date(start.getTime() - pad), new Date(end.getTime() + pad));
+    const busy = await getBusy(config.busyCalendars, new Date(start.getTime() - pad), new Date(end.getTime() + pad), s.hostEmail ? [s.hostEmail] : []);
     if (!isSlotAvailable(ev, rulesOf(s), busy, start.toISOString())) {
       return NextResponse.json({ error: "この時間はすでに埋まっています。別の時間を選んでください。" }, { status: 409 });
     }
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     const cancelUrl = `${appUrl}/cancel/${eventId}?sig=${sign(eventId)}`;
     const lines = [
       `予約メニュー: ${ev.name}`,
+      s.hostName && `担当: ${s.hostName}`,
       `お名前: ${name}`,
       `メール: ${email}`,
       company && `会社名: ${company}`,
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
       end,
       timeZone: s.timeZone,
       attendee: { email, name },
+      extraAttendees: s.hostEmail && s.hostEmail.toLowerCase() !== email.toLowerCase() ? [{ email: s.hostEmail, name: s.hostName || "担当者" }] : [],
       googleMeet: ev.location.type === "google_meet",
       location: locationText,
       // 拡張プロパティは1値1024バイトまで
