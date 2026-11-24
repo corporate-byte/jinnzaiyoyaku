@@ -70,6 +70,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       <div className={`status ${status.ok ? (status.mode === "mock" ? "warn" : "good") : "bad"}`}>
         {status.ok ? (status.mode === "mock" ? "⚠ " : "● ") : "✕ "}
         {status.detail}
+        {status.mode === "mock" && (
+          <a className="btn sm" style={{ marginLeft: 12 }} href="/api/auth/google">Googleカレンダーと連携する</a>
+        )}
       </div>
 
       {!past && (

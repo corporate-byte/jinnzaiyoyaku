@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 <h1>Google カレンダー連携 完了</h1>
 ${
   tok.refresh_token
-    ? `<p>以下を環境変数 <code>GOOGLE_REFRESH_TOKEN</code> に設定し、<code>MOCK_GOOGLE</code> を削除（または 0）にしてサーバーを再起動してください。</p>
+    ? `<p>下の文字列をすべてコピーして、Vercel の jinnzaiyoyaku → Settings → Environment Variables に <b>Key：<code>GOOGLE_REFRESH_TOKEN</code></b> として追加してください。<br>あわせて <code>MOCK_GOOGLE</code> を削除し、Deployments から <b>Redeploy</b> すると連携が有効になります。</p>
 <textarea readonly style="width:100%;height:90px">${esc(tok.refresh_token)}</textarea>
 <p style="color:#b00">※このトークンは他人に見せないでください。</p>`
     : `<p>リフレッシュトークンが返されませんでした。<a href="https://myaccount.google.com/permissions">Googleアカウントのアクセス権</a>からこのアプリを削除して、もう一度連携してください。</p>`
