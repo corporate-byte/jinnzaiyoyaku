@@ -39,7 +39,7 @@ async function gfetch(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 // ---------- モック（Google未設定時のデモ用） ----------
-type MockEvent = { id: string; start: Date; end: Date; summary: string; attendee: string };
+type MockEvent = { id: string; start: Date; end: Date; summary: string; attendee: string; meta: Record<string, string>; meetUrl?: string };
 const g = globalThis as unknown as { __mockEvents?: MockEvent[] };
 const mockEvents = (g.__mockEvents ??= []);
 
@@ -76,12 +76,14 @@ export async function createEvent(input: {
   attendee: { email: string; name: string };
   googleMeet: boolean;
   location?: string;
+  meta: Record<string, string>; // 管理画面用の予約情報（イベントの非公開プロパティに保存）
 }): Promise<CreatedEvent> {
   if (isMock()) {
     const id = input.id;
-    mockEvents.push({ id, start: input.start, end: input.end, summary: input.summary, attendee: input.attendee.email });
+    const meetUrl = input.googleMeet ? "https://meet.google.com/xxx-mock-xxx" : undefined;
+    mockEvents.push({ id, start: input.start, end: input.end, summary: input.summary, attendee: input.attendee.email, meta: input.meta, meetUrl });
     console.log("[mock] event created", input);
-    return { id, meetUrl: input.googleMeet ? "https://meet.google.com/xxx-mock-xxx" : undefined };
+    return { id, meetUrl };
   }
   const body: Record<string, unknown> = {
     id: input.id,
@@ -91,6 +93,7 @@ export async function createEvent(input: {
     end: { dateTime: input.end.toISOString(), timeZone: input.timeZone },
     attendees: [{ email: input.attendee.email, displayName: input.attendee.name }],
     reminders: { useDefault: true },
+    extendedProperties: { private: { bookingApp: "1", ...input.meta } },
   };
   if (input.location) body.location = input.location;
   if (input.googleMeet) {
@@ -105,6 +108,68 @@ export async function createEvent(input: {
   const j = await res.json();
   const meetUrl = j.hangoutLink ?? j.conferenceData?.entryPoints?.find((p: { entryPointType: string }) => p.entryPointType === "video")?.uri;
   return { id: j.id, htmlLink: j.htmlLink, meetUrl };
+}
+
+export type Booking = {
+  id: string;
+  start: Date;
+  end: Date;
+  slug: string;
+  menu: string;
+  name: string;
+  email: string;
+  company: string;
+  message: string;
+  meetUrl?: string;
+  htmlLink?: string;
+};
+
+/** このアプリ経由で入った予約の一覧（Googleカレンダーから取得） */
+export async function listBookings(calendarId: string, timeMin: Date, timeMax: Date): Promise<Booking[]> {
+  const fromMeta = (id: string, start: Date, end: Date, m: Record<string, string>, meetUrl?: string, htmlLink?: string): Booking => ({
+    id, start, end, meetUrl, htmlLink,
+    slug: m.slug ?? "", menu: m.menu ?? "", name: m.name ?? "", email: m.email ?? "", company: m.company ?? "", message: m.message ?? "",
+  });
+  if (isMock()) {
+    return mockEvents
+      .filter((e) => e.end > timeMin && e.start < timeMax)
+      .sort((a, b) => +a.start - +b.start)
+      .map((e) => fromMeta(e.id, e.start, e.end, e.meta, e.meetUrl));
+  }
+  const out: Booking[] = [];
+  let pageToken = "";
+  do {
+    const q = new URLSearchParams({
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+      singleEvents: "true",
+      orderBy: "startTime",
+      privateExtendedProperty: "bookingApp=1",
+      maxResults: "250",
+    });
+    if (pageToken) q.set("pageToken", pageToken);
+    const res = await gfetch(`/calendars/${encodeURIComponent(calendarId)}/events?${q}`);
+    if (!res.ok) throw new Error(`events.list failed: ${res.status} ${await res.text()}`);
+    const j = await res.json();
+    for (const e of j.items ?? []) {
+      if (e.status === "cancelled") continue;
+      out.push(fromMeta(e.id, new Date(e.start.dateTime ?? e.start.date), new Date(e.end.dateTime ?? e.end.date), e.extendedProperties?.private ?? {}, e.hangoutLink, e.htmlLink));
+    }
+    pageToken = j.nextPageToken ?? "";
+  } while (pageToken);
+  return out;
+}
+
+/** Google 連携が動いているかの確認 */
+export async function connectionStatus(): Promise<{ mode: "mock" | "google"; ok: boolean; detail: string }> {
+  if (isMock()) return { mode: "mock", ok: true, detail: "デモモード（Google未連携・予約はメモリ上に保存）" };
+  try {
+    const now = new Date();
+    await getBusy(["primary"], now, new Date(now.getTime() + 60000));
+    return { mode: "google", ok: true, detail: "Googleカレンダーと連携中" };
+  } catch (e) {
+    return { mode: "google", ok: false, detail: String((e as Error).message).slice(0, 200) };
+  }
 }
 
 export async function getEvent(calendarId: string, eventId: string): Promise<{ summary: string; start: Date; end: Date; status: string } | null> {

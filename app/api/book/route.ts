@@ -58,6 +58,8 @@ export async function POST(req: NextRequest) {
       attendee: { email, name },
       googleMeet: ev.location.type === "google_meet",
       location: locationText,
+      // 拡張プロパティは1値1024バイトまで
+      meta: { slug: ev.slug, menu: ev.name, name, email, company, message: message.slice(0, 300) },
     });
 
     return NextResponse.json({
