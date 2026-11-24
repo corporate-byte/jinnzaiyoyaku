@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
-import { getEventType } from "@/config/booking.config.ts";
+import { findMenu } from "@/lib/settings.ts";
 import { baseUrl } from "@/lib/baseUrl.ts";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const isTop = slug === "top";
-  if (!isTop && !getEventType(slug)) return new NextResponse("Not found", { status: 404 });
+  if (!isTop && !(await findMenu(slug))) return new NextResponse("Not found", { status: 404 });
   const url = `${await baseUrl()}/${isTop ? "" : slug}`;
   const opts = { margin: 2, errorCorrectionLevel: "M" as const };
   const name = `qr-${slug}`;

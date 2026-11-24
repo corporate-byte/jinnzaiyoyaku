@@ -1,7 +1,8 @@
-import { config } from "@/config/booking.config.ts";
+import { getSettings } from "@/lib/settings.ts";
 
 export default async function Login({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
+  const config = await getSettings();
   return (
     <main className="wrap">
       <form className="card pad form login" method="post" action="/api/admin/login">

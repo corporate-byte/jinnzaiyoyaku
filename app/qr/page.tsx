@@ -1,14 +1,15 @@
 import QRCode from "qrcode";
-import { config } from "@/config/booking.config.ts";
+import { getSettings } from "@/lib/settings.ts";
 import { baseUrl } from "@/lib/baseUrl.ts";
 
 export const dynamic = "force-dynamic";
 
 export default async function QrPage() {
   const base = await baseUrl();
+  const s = await getSettings();
   const items = [
     { slug: "top", name: "メニュー一覧（トップ）", url: `${base}/` },
-    ...config.eventTypes.map((e) => ({ slug: e.slug, name: e.name, url: `${base}/${e.slug}` })),
+    ...s.eventTypes.filter((e) => e.active).map((e) => ({ slug: e.slug, name: e.name, url: `${base}/${e.slug}` })),
   ];
   const svgs = await Promise.all(items.map((i) => QRCode.toString(i.url, { type: "svg", margin: 2 })));
   const isLocal = /localhost|127\.0\.0\.1/.test(base);

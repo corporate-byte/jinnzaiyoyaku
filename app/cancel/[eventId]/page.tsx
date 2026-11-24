@@ -1,6 +1,7 @@
 import { config } from "@/config/booking.config.ts";
 import { getEvent } from "@/lib/google.ts";
 import { verify } from "@/lib/sign.ts";
+import { getSettings } from "@/lib/settings.ts";
 import { formatJa } from "@/lib/time.ts";
 import CancelButton from "@/components/CancelButton";
 
@@ -16,6 +17,7 @@ export default async function CancelPage({
   const { eventId } = await params;
   const { sig = "" } = await searchParams;
   const valid = verify(eventId, sig);
+  const tz = (await getSettings()).timeZone;
   const ev = valid ? await getEvent(config.bookingCalendar, eventId) : null;
   return (
     <main className="wrap">
@@ -29,9 +31,9 @@ export default async function CancelPage({
             <h1>予約のキャンセル</h1>
             <p className="big">{ev.summary}</p>
             <p>
-              {formatJa(ev.start, config.timeZone, { year: "numeric", month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" })}
+              {formatJa(ev.start, tz, { year: "numeric", month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" })}
               {" 〜 "}
-              {formatJa(ev.end, config.timeZone, { hour: "2-digit", minute: "2-digit" })}
+              {formatJa(ev.end, tz, { hour: "2-digit", minute: "2-digit" })}
             </p>
             <CancelButton eventId={eventId} sig={sig} />
           </>

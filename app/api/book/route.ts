@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { config, getEventType } from "@/config/booking.config.ts";
+import { config } from "@/config/booking.config.ts";
+import { findMenu, getSettings, rulesOf } from "@/lib/settings.ts";
+import { recordBooking } from "@/lib/bookingsDb.ts";
 import { createEvent, getBusy, newEventId } from "@/lib/google.ts";
 import { isSlotAvailable } from "@/lib/slots.ts";
-import { rules } from "@/lib/rules.ts";
 import { sign } from "@/lib/sign.ts";
 import { formatJa } from "@/lib/time.ts";
 
@@ -11,7 +12,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null);
-  const ev = getEventType(String(b?.slug ?? ""));
+  const s = await getSettings();
+  const ev = await findMenu(String(b?.slug ?? ""));
   if (!ev) return NextResponse.json({ error: "メニューが見つかりません" }, { status: 404 });
 
   const name = String(b.name ?? "").trim().slice(0, 100);
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
   try {
     const pad = Math.max(ev.bufferBeforeMinutes, ev.bufferAfterMinutes) * 60000 + 3600000;
     const busy = await getBusy(config.busyCalendars, new Date(start.getTime() - pad), new Date(end.getTime() + pad));
-    if (!isSlotAvailable(ev, rules, busy, start.toISOString())) {
+    if (!isSlotAvailable(ev, rulesOf(s), busy, start.toISOString())) {
       return NextResponse.json({ error: "この時間はすでに埋まっています。別の時間を選んでください。" }, { status: 409 });
     }
 
@@ -54,7 +56,7 @@ export async function POST(req: NextRequest) {
       description: lines.join("\n"),
       start,
       end,
-      timeZone: config.timeZone,
+      timeZone: s.timeZone,
       attendee: { email, name },
       googleMeet: ev.location.type === "google_meet",
       location: locationText,
@@ -62,12 +64,17 @@ export async function POST(req: NextRequest) {
       meta: { slug: ev.slug, menu: ev.name, name, email, company, message: message.slice(0, 300) },
     });
 
+    // 予約記録を Supabase に保存（失敗しても予約自体は成立しているので続行）
+    await recordBooking({
+      id: created.id, slug: ev.slug, menu: ev.name, start, end, name, email, company, message, meetUrl: created.meetUrl,
+    }).catch((e) => console.error("recordBooking failed", e));
+
     return NextResponse.json({
       ok: true,
       eventId: created.id,
       start: start.toISOString(),
       end: end.toISOString(),
-      label: formatJa(start, config.timeZone, { year: "numeric", month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }),
+      label: formatJa(start, s.timeZone, { year: "numeric", month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }),
       meetUrl: created.meetUrl ?? null,
       locationText: locationText ?? null,
       cancelUrl,

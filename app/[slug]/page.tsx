@@ -1,10 +1,13 @@
 import { notFound } from "next/navigation";
-import { config, getEventType } from "@/config/booking.config.ts";
+import { findMenu, getSettings } from "@/lib/settings.ts";
+
+export const dynamic = "force-dynamic";
 import BookingWidget from "@/components/BookingWidget";
 
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const ev = getEventType(slug);
+  const config = await getSettings();
+  const ev = await findMenu(slug);
   if (!ev) notFound();
   const locationLabel = { google_meet: "Google Meet", zoom: "Zoom", in_person: "対面", phone: "電話" }[ev.location.type];
   return (

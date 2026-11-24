@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { config } from "@/config/booking.config.ts";
+import { getSettings } from "@/lib/settings.ts";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const config = await getSettings();
   return (
     <main className="wrap">
       <header className="team">
@@ -10,7 +13,7 @@ export default function Home() {
         <p className="muted">ご希望のメニューを選んでください</p>
       </header>
       <ul className="menu">
-        {config.eventTypes.map((ev) => (
+        {config.eventTypes.filter((e) => e.active).map((ev) => (
           <li key={ev.slug}>
             <Link href={`/${ev.slug}`} className="menu-item" style={{ borderLeftColor: ev.color }}>
               <span className="menu-name">{ev.name}</span>

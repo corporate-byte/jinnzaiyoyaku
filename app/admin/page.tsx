@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { config } from "@/config/booking.config.ts";
+import { config as calendars } from "@/config/booking.config.ts";
+import { getSettings } from "@/lib/settings.ts";
+import { listBookingsDb } from "@/lib/bookingsDb.ts";
+import { supabaseEnabled } from "@/lib/supabase.ts";
 import { isAdmin } from "@/lib/admin.ts";
 import { connectionStatus, listBookings, type Booking } from "@/lib/google.ts";
 import { addDays, formatJa, localDateStr, zonedToUtc } from "@/lib/time.ts";
@@ -11,10 +14,16 @@ export const dynamic = "force-dynamic";
 const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
 const LOCATION = { google_meet: "Google Meet", zoom: "Zoom", in_person: "対面", phone: "電話" };
 
+// Supabase があれば予約記録から、なければ Google カレンダーから一覧を取る
+function fetchBookings(from: Date, to: Date): Promise<Booking[]> {
+  return supabaseEnabled() ? listBookingsDb(from, to) : listBookings(calendars.bookingCalendar, from, to);
+}
+
 export default async function Admin({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   if (!(await isAdmin())) redirect("/admin/login");
   const { view } = await searchParams;
   const past = view === "past";
+  const config = await getSettings();
   const tz = config.timeZone;
   const today = localDateStr(new Date(), tz);
   const now = new Date();
@@ -22,8 +31,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const [status, bookings] = await Promise.all([
     connectionStatus(),
     (past
-      ? listBookings(config.bookingCalendar, zonedToUtc(addDays(today, -30), "00:00", tz), now)
-      : listBookings(config.bookingCalendar, now, zonedToUtc(addDays(today, 61), "00:00", tz))
+      ? fetchBookings(zonedToUtc(addDays(today, -30), "00:00", tz), now)
+      : fetchBookings(now, zonedToUtc(addDays(today, 61), "00:00", tz))
     ).catch((e) => (console.error(e), null)),
   ]);
   const list = past ? (bookings ?? []).slice().reverse() : bookings ?? [];
@@ -52,6 +61,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         </div>
         <nav className="admin-nav">
           <Link href="/" target="_blank">予約ページを見る ↗</Link>
+          <Link href="/admin/settings">⚙ 設定を変更</Link>
           <Link href="/qr">QRコード</Link>
           <form method="post" action="/api/admin/logout"><button className="link">ログアウト</button></form>
         </nav>
@@ -119,7 +129,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <div className="menus">
           {config.eventTypes.map((e) => (
             <div key={e.slug} className="menu-cfg" style={{ borderLeftColor: e.color }}>
-              <strong>{e.name}</strong>
+              <strong>{e.name}{!e.active && <span className="muted small">（非公開）</span>}</strong>
               <div className="small muted">
                 {e.durationMinutes}分・{e.intervalMinutes}分刻み・前後の間隔 {e.bufferBeforeMinutes}/{e.bufferAfterMinutes}分・
                 {e.minNoticeMinutes >= 60 ? `${Math.round(e.minNoticeMinutes / 60)}時間前` : `${e.minNoticeMinutes}分前`}まで・{e.bookingWindowDays}日先まで・{LOCATION[e.location.type]}
@@ -128,7 +138,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
             </div>
           ))}
         </div>
-        <p className="small muted">※設定の変更は <code>config/booking.config.ts</code> を編集します。</p>
+        <p><Link className="btn sm" href="/admin/settings">設定を変更する</Link></p>
       </section>
     </main>
   );
