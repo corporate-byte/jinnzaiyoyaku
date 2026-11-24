@@ -89,3 +89,9 @@ h3 { font-size: 1rem; margin: 0 0 12px; }
   .pick { grid-template-columns: 1fr; }
   .time-list { grid-template-columns: repeat(3, 1fr); max-height: none; }
 }
+
+/* QRページ */
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.qr-card { padding: 20px; text-align: center; }
+.qr svg { width: 100%; max-width: 220px; height: auto; display: block; margin: 0 auto; }
+.qr-url { word-break: break-all; }
