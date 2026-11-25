@@ -22,6 +22,9 @@ export default async function Home() {
           </li>
         ))}
       </ul>
+      <p className="muted small" style={{ textAlign: "center", marginTop: 24 }}>
+        <a href="/privacy">プライバシーポリシー</a>　<a href="/terms">利用規約</a>
+      </p>
     </main>
   );
 }
