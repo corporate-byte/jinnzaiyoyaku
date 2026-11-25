@@ -5,27 +5,66 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const API = "https://www.googleapis.com/calendar/v3";
 export const SCOPES = ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.freebusy"];
 
-export function isMock(): boolean {
-  return process.env.MOCK_GOOGLE === "1" || !process.env.GOOGLE_REFRESH_TOKEN;
+import { sb, supabaseEnabled } from "./supabase.ts";
+
+// 連携の鍵（リフレッシュトークン）は、環境変数 GOOGLE_REFRESH_TOKEN か Supabase の booking_google に保存したもの
+let tokenCache: { v: string | null; at: number } | null = null;
+async function refreshToken(): Promise<string | null> {
+  if (process.env.GOOGLE_REFRESH_TOKEN) return process.env.GOOGLE_REFRESH_TOKEN;
+  if (!supabaseEnabled()) return null;
+  if (tokenCache && Date.now() - tokenCache.at < 30000) return tokenCache.v;
+  try {
+    const rows = (await (await sb("/booking_google?select=refresh_token&id=eq.1")).json()) as { refresh_token: string }[];
+    tokenCache = { v: rows[0]?.refresh_token ?? null, at: Date.now() };
+  } catch (e) {
+    console.error(e);
+    tokenCache = { v: null, at: Date.now() };
+  }
+  return tokenCache.v;
 }
 
-let cached: { token: string; exp: number } | null = null;
+/** 連携ボタンで取得したリフレッシュトークンを保存（Supabase） */
+export async function saveRefreshToken(token: string): Promise<boolean> {
+  if (!supabaseEnabled()) return false;
+  await sb("/booking_google?on_conflict=id", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: JSON.stringify({ id: 1, refresh_token: token, updated_at: new Date().toISOString() }),
+  });
+  tokenCache = null;
+  cached = null;
+  return true;
+}
+
+/** Google と連携していない（デモ動作）か */
+export async function isMock(): Promise<boolean> {
+  if (process.env.MOCK_GOOGLE === "1" || !process.env.GOOGLE_CLIENT_ID) return true;
+  return !(await refreshToken());
+}
+
+let cached: { token: string; exp: number; rt: string } | null = null;
 
 async function accessToken(): Promise<string> {
-  if (cached && cached.exp > Date.now() + 60000) return cached.token;
+  const rt = await refreshToken();
+  if (!rt) throw new Error("Googleカレンダーと連携されていません");
+  if (cached && cached.rt === rt && cached.exp > Date.now() + 60000) return cached.token;
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,
       client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN!,
+      refresh_token: rt,
       grant_type: "refresh_token",
     }),
   });
-  if (!res.ok) throw new Error(`Google token refresh failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const t = await res.text();
+    if (/invalid_grant/.test(t)) throw new Error("Google連携の期限が切れました。管理画面の「Googleカレンダーと連携する」を押し直してください");
+    throw new Error(`Google token refresh failed: ${res.status} ${t}`);
+  }
   const j = await res.json();
-  cached = { token: j.access_token, exp: Date.now() + j.expires_in * 1000 };
+  cached = { token: j.access_token, exp: Date.now() + j.expires_in * 1000, rt };
   return cached.token;
 }
 
@@ -47,7 +86,7 @@ const mockEvents = (g.__mockEvents ??= []);
 
 /** optional に入れたカレンダーは、見られなくてもエラーにしない（担当者のカレンダーなど） */
 export async function getBusy(calendars: string[], timeMin: Date, timeMax: Date, optional: string[] = []): Promise<Interval[]> {
-  if (isMock()) {
+  if (await isMock()) {
     return mockEvents.filter((e) => e.end > timeMin && e.start < timeMax).map((e) => ({ start: e.start, end: e.end }));
   }
   const res = await gfetch("/freeBusy", {
@@ -83,7 +122,7 @@ export async function createEvent(input: {
   location?: string;
   meta: Record<string, string>; // 管理画面用の予約情報（イベントの非公開プロパティに保存）
 }): Promise<CreatedEvent> {
-  if (isMock()) {
+  if (await isMock()) {
     const id = input.id;
     const meetUrl = input.googleMeet ? "https://meet.google.com/xxx-mock-xxx" : undefined;
     mockEvents.push({ id, start: input.start, end: input.end, summary: input.summary, attendee: input.attendee.email, meta: input.meta, meetUrl });
@@ -135,7 +174,7 @@ export async function listBookings(calendarId: string, timeMin: Date, timeMax: D
     id, start, end, meetUrl, htmlLink,
     slug: m.slug ?? "", menu: m.menu ?? "", name: m.name ?? "", email: m.email ?? "", company: m.company ?? "", message: m.message ?? "",
   });
-  if (isMock()) {
+  if (await isMock()) {
     return mockEvents
       .filter((e) => e.end > timeMin && e.start < timeMax)
       .sort((a, b) => +a.start - +b.start)
@@ -167,7 +206,7 @@ export async function listBookings(calendarId: string, timeMin: Date, timeMax: D
 
 /** Google 連携が動いているかの確認 */
 export async function connectionStatus(): Promise<{ mode: "mock" | "google"; ok: boolean; detail: string }> {
-  if (isMock()) return { mode: "mock", ok: true, detail: "デモモード（Google未連携・予約はメモリ上に保存）" };
+  if (await isMock()) return { mode: "mock", ok: true, detail: "デモモード（Google未連携・予約はメモリ上に保存）" };
   try {
     const now = new Date();
     await getBusy(["primary"], now, new Date(now.getTime() + 60000));
@@ -178,7 +217,7 @@ export async function connectionStatus(): Promise<{ mode: "mock" | "google"; ok:
 }
 
 export async function getEvent(calendarId: string, eventId: string): Promise<{ summary: string; start: Date; end: Date; status: string } | null> {
-  if (isMock()) {
+  if (await isMock()) {
     const e = mockEvents.find((x) => x.id === eventId);
     return e ? { summary: e.summary, start: e.start, end: e.end, status: "confirmed" } : null;
   }
@@ -190,7 +229,7 @@ export async function getEvent(calendarId: string, eventId: string): Promise<{ s
 }
 
 export async function cancelEvent(calendarId: string, eventId: string): Promise<void> {
-  if (isMock()) {
+  if (await isMock()) {
     const i = mockEvents.findIndex((x) => x.id === eventId);
     if (i >= 0) mockEvents.splice(i, 1);
     return;

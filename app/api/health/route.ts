@@ -24,5 +24,5 @@ export async function GET() {
       supabase = "接続エラー: " + String((e as Error).message).replace(/sb_secret_\S+|eyJ\S+/g, "***").slice(0, 200);
     }
   }
-  return NextResponse.json({ supabase, google: isMock() ? "デモモード" : "Google連携", env }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ supabase, google: (await isMock()) ? "デモモード" : "Google連携", env }, { headers: { "Cache-Control": "no-store" } });
 }

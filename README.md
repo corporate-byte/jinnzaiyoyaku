@@ -48,17 +48,13 @@ http://localhost:3000 を開く。予約はメモリ上に保存されます。
 
 ## 3. Googleカレンダーと連携する
 
-1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成
-2. 「APIとサービス」→「ライブラリ」で **Google Calendar API** を有効化
-3. 「OAuth同意画面」を設定（外部 / 自分をテストユーザーに追加 → 本番運用時は「公開」に）
-4. 「認証情報」→「OAuthクライアントID」→ 種類 **ウェブアプリケーション**
-   - 承認済みリダイレクトURI: `{APP_URL}/api/auth/google/callback`
-     （例: `http://localhost:3000/api/auth/google/callback`、本番は `https://あなたのドメイン/api/auth/google/callback`）
-5. `.env.local` に `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `APP_URL` / `ADMIN_SECRET` を設定して起動
-6. ブラウザで `{APP_URL}/api/auth/google?secret={ADMIN_SECRET}` を開き、予約を受けるGoogleアカウントでログイン
-7. 表示されたリフレッシュトークンを `GOOGLE_REFRESH_TOKEN` に設定し、`MOCK_GOOGLE` を削除して再起動
+1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成し、**Google Calendar API** を有効化
+2. 「Google Auth Platform」で同意画面を作成（対象：外部）。「対象」→ **テストユーザー** に、予約を入れるカレンダーのGoogleアカウントを追加
+3. 「クライアント」→ **ウェブ アプリケーション** を作成。承認済みのリダイレクトURI：`{APP_URL}/api/auth/google/callback`
+4. Vercel の環境変数に `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `APP_URL` を設定し、`MOCK_GOOGLE` を削除して Redeploy
+5. 管理画面の「**Googleカレンダーと連携する**」を押して、予約を入れたいアカウントで許可（鍵は Supabase の `booking_google` に自動保存）
 
-> ⚠ OAuth同意画面が「テスト」状態のままだと、リフレッシュトークンが7日で失効します。運用時は「本番環境に公開」してください。
+> 同意画面が「テスト」のままだと連携が7日で切れます。管理画面に赤い表示が出たら「Googleカレンダーと連携する」を押し直してください（1分で終わります）。「アプリを公開」で本番にできれば切れなくなります。
 
 ## 4. 公開（例: Vercel）
 
