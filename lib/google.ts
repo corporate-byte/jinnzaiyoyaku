@@ -246,7 +246,7 @@ export function authUrl(redirectUri: string, state: string): string {
     response_type: "code",
     scope: SCOPES.join(" "),
     access_type: "offline",
-    prompt: "consent",
+    prompt: "select_account consent", // 毎回アカウントを選べるように
     state,
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${p}`;
