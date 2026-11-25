@@ -14,6 +14,7 @@ export async function GET() {
     APP_URL: !!process.env.APP_URL,
     GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
     GOOGLE_REFRESH_TOKEN: !!process.env.GOOGLE_REFRESH_TOKEN,
+    MOCK_GOOGLE_残っている: process.env.MOCK_GOOGLE === "1",
   };
   let supabase = "未設定";
   if (supabaseEnabled()) {
