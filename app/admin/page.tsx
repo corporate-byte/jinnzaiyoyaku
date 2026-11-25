@@ -8,6 +8,8 @@ import { isAdmin } from "@/lib/admin.ts";
 import { connectionStatus, listBookings, type Booking } from "@/lib/google.ts";
 import { addDays, formatJa, localDateStr, zonedToUtc } from "@/lib/time.ts";
 import AdminCancelButton from "@/components/AdminCancelButton";
+import LineTestButton from "@/components/LineTestButton";
+import { lineEnabled, listTargets } from "@/lib/line.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       : fetchBookings(now, zonedToUtc(addDays(today, 61), "00:00", tz))
     ).catch((e) => (console.error(e), null)),
   ]);
+  const lineTargets = lineEnabled() ? await listTargets().then((t) => t.length).catch(() => null) : 0;
   const list = past ? (bookings ?? []).slice().reverse() : bookings ?? [];
 
   const inDays = (n: number) => zonedToUtc(addDays(today, n), "00:00", tz).getTime();
@@ -75,6 +78,17 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         )}
         {status.mode === "google" && status.ok && (
           <a className="small" style={{ marginLeft: 12 }} href="/api/auth/google">別のアカウントで連携し直す</a>
+        )}
+      </div>
+
+      <div className="status line">
+        {lineEnabled() ? (
+          <>
+            LINE通知：{lineTargets === null ? "確認できません" : lineTargets ? `${lineTargets}か所に送ります` : "送り先なし（LINEグループに公式アカウントを招待してください）"}
+            <span style={{ marginLeft: 12 }}><LineTestButton /></span>
+          </>
+        ) : (
+          <>LINE通知：未設定</>
         )}
       </div>
 

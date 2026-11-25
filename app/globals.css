@@ -172,3 +172,5 @@ h3 { font-size: 1rem; margin: 0 0 12px; }
 .legal h1 { margin-bottom: 12px; }
 .legal h2 { font-size: 1rem; margin: 20px 0 6px; }
 .legal p { margin: 0 0 8px; font-size: 0.95rem; }
+
+.status.line { background: #eef8ee; color: #1d6b2f; font-weight: 500; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }

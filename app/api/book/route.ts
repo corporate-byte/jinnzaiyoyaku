@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { config } from "@/config/booking.config.ts";
 import { findMenu, getSettings, rulesOf } from "@/lib/settings.ts";
 import { recordBooking } from "@/lib/bookingsDb.ts";
+import { notifyLine } from "@/lib/line.ts";
 import { createEvent, getBusy, newEventId } from "@/lib/google.ts";
 import { isSlotAvailable } from "@/lib/slots.ts";
 import { sign } from "@/lib/sign.ts";
@@ -70,6 +71,14 @@ export async function POST(req: NextRequest) {
     await recordBooking({
       id: created.id, slug: ev.slug, menu: ev.name, start, end, name, email, company, message, meetUrl: created.meetUrl,
     }).catch((e) => console.error("recordBooking failed", e));
+
+    // 社内へLINE通知（失敗しても予約は成立）
+    const when = `${formatJa(start, s.timeZone, { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" })}〜${formatJa(end, s.timeZone, { hour: "2-digit", minute: "2-digit" })}`;
+    await notifyLine(
+      [`🔔 新しい面談予約`, `${name} 様${company ? `（${company}）` : ""}`, when, ev.name, `メール: ${email}`, message && `メッセージ: ${message.slice(0, 300)}`, created.meetUrl && `Meet: ${created.meetUrl}`, `管理画面: ${appUrl}/admin`]
+        .filter(Boolean)
+        .join("\n"),
+    ).catch((e) => console.error("notifyLine failed", e));
 
     return NextResponse.json({
       ok: true,

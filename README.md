@@ -56,6 +56,16 @@ http://localhost:3000 を開く。予約はメモリ上に保存されます。
 
 > 同意画面が「テスト」のままだと連携が7日で切れます。管理画面に赤い表示が出たら「Googleカレンダーと連携する」を押し直してください（1分で終わります）。「アプリを公開」で本番にできれば切れなくなります。
 
+## LINE通知
+
+予約・キャンセルのたびに、LINEグループ（または個人）へお知らせを送ります。
+
+1. LINE公式アカウントを作成し、Messaging API を有効化
+2. Webhook URL：`{APP_URL}/api/line/webhook`（「Webhookの利用」をオン）
+3. Vercel に `LINE_CHANNEL_SECRET` と `LINE_CHANNEL_ACCESS_TOKEN` を設定して Redeploy
+4. 公式アカウントを通知したいLINEグループに招待（自動で通知先に登録）。止めるときはグループで「解除」と送る
+5. 管理画面の「LINEにテスト通知」で確認
+
 ## 4. 公開（例: Vercel）
 
 GitHubにpushして [Vercel](https://vercel.com) でインポート → Environment Variables に `.env.local` と同じ値（`MOCK_GOOGLE` 以外）を設定 → デプロイ。
