@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
   if (!process.env.GOOGLE_CLIENT_ID) return new NextResponse("Vercel の環境変数 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / APP_URL を設定して Redeploy してください", { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } });
-  const appUrl = process.env.APP_URL ?? req.nextUrl.origin;
+  const appUrl = (process.env.APP_URL?.trim() || req.nextUrl.origin).replace(/\/+$/, "");
   const nonce = crypto.randomUUID();
   return NextResponse.redirect(authUrl(`${appUrl}/api/auth/google/callback`, `${nonce}.${sign(nonce)}`));
 }

@@ -12,8 +12,19 @@ export async function GET(req: NextRequest) {
   if (!nonce || !sig || !verify(nonce, sig)) return new NextResponse("Invalid state", { status: 403 });
   const code = q.get("code");
   if (!code) return new NextResponse(`連携がキャンセルされました: ${esc(q.get("error") ?? "")}`, { status: 400 });
-  const appUrl = process.env.APP_URL ?? req.nextUrl.origin;
-  const tok = await exchangeCode(code, `${appUrl}/api/auth/google/callback`);
+  const appUrl = (process.env.APP_URL?.trim() || req.nextUrl.origin).replace(/\/+$/, "");
+  let tok: { refresh_token?: string };
+  try {
+    tok = await exchangeCode(code, `${appUrl}/api/auth/google/callback`);
+  } catch (e) {
+    const msg = String((e as Error).message);
+    const hint = /invalid_client|unauthorized_client/.test(msg)
+      ? "Vercel の GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET が Google Cloud のクライアントと一致しているか確認してください。"
+      : /redirect_uri_mismatch/.test(msg)
+        ? "Google Cloud のクライアントの「承認済みのリダイレクト URI」を確認してください。"
+        : "";
+    return new NextResponse(`<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;max-width:640px;margin:40px auto;padding:0 16px;line-height:1.7"><h1>連携できませんでした</h1><p>${esc(hint)}</p><pre style="white-space:pre-wrap;background:#f4f4f4;padding:10px;font-size:12px">${esc(msg.slice(0, 400))}</pre><p><a href="/admin">管理画面に戻る</a></p></body>`, { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
+  }
   let saved = false;
   if (tok.refresh_token) {
     try {

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "この時間はすでに埋まっています。別の時間を選んでください。" }, { status: 409 });
     }
 
-    const appUrl = process.env.APP_URL ?? req.nextUrl.origin;
+    const appUrl = (process.env.APP_URL?.trim() || req.nextUrl.origin).replace(/\/+$/, "");
     const locationText =
       ev.location.type === "zoom" ? ev.location.url : ev.location.type === "in_person" ? ev.location.address : undefined;
     const eventId = newEventId();
