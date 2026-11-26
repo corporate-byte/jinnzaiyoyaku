@@ -46,24 +46,43 @@ export function splitByKeyword(events: CalEvent[], keyword: string, s: Pick<Sett
 }
 
 export async function getAvailability(s: Settings, timeMin: Date, timeMax: Date): Promise<Availability> {
-  const optional = s.hostEmail ? [s.hostEmail] : [];
-  if (s.availabilityMode !== "keyword") {
-    return { busy: await getBusy(calendars.busyCalendars, timeMin, timeMax, optional) };
+  const keyword = s.availabilityKeyword || "伏見";
+  const host = s.hostEmail?.trim();
+
+  // 担当者のメールアドレスがあるとき：担当者のカレンダーだけで受付時間・かぶりを判定する。
+  // 連携アカウントのカレンダーからは、この予約アプリが入れた予約だけを見る（二重予約防止）
+  if (host) {
+    const mine: Interval[] = [];
+    for (const id of calendars.busyCalendars) {
+      for (const e of await listEvents(id, timeMin, timeMax)) if (e.mine) mine.push({ start: e.start, end: e.end });
+    }
+    let hostEvents: CalEvent[] | null = null;
+    try {
+      hostEvents = await listEvents(host, timeMin, timeMax);
+    } catch (e) {
+      console.error("担当者カレンダーの予定を読めませんでした（共有設定を確認）", e);
+    }
+    if (hostEvents) {
+      if (s.availabilityMode === "keyword") {
+        const r = splitByKeyword(hostEvents, keyword, s);
+        return { busy: [...r.busy, ...mine], windows: r.windows };
+      }
+      const busy = hostEvents.filter((e) => e.busy && !e.allDay).map((e) => ({ start: e.start, end: e.end }));
+      return { busy: [...busy, ...mine] };
+    }
+    // 題名が読めない（予定の有無だけ共有されている）場合：予定ありの時間だけ使う
+    const hostBusy = await getBusy([], timeMin, timeMax, [host]).catch(() => [] as Interval[]);
+    if (s.availabilityMode === "keyword") return { busy: [...hostBusy, ...mine], windows: {} }; // 「伏見」が読めないので受付なし
+    return { busy: [...hostBusy, ...mine] };
   }
-  // キーワードモード：連携カレンダー（と、見られれば担当者のカレンダー）の予定を題名つきで読む
+
+  // 担当者のメールアドレスがないとき：連携アカウントのカレンダーで判定
+  if (s.availabilityMode !== "keyword") {
+    return { busy: await getBusy(calendars.busyCalendars, timeMin, timeMax) };
+  }
   const all: CalEvent[] = [];
   for (const id of calendars.busyCalendars) all.push(...(await listEvents(id, timeMin, timeMax)));
-  const extraBusy: Interval[] = [];
-  for (const id of optional) {
-    try {
-      all.push(...(await listEvents(id, timeMin, timeMax)));
-    } catch {
-      // 題名が見られない（共有されていない）担当者カレンダーは「予定あり」だけ見る
-      extraBusy.push(...(await getBusy([], timeMin, timeMax, [id]).catch(() => [])));
-    }
-  }
-  const r = splitByKeyword(all, s.availabilityKeyword || "伏見", s);
-  return { busy: [...r.busy, ...extraBusy], windows: r.windows };
+  return splitByKeyword(all, keyword, s);
 }
 
 /** 終日でない予定の時間を、日付の範囲として取得するときの範囲（前後1日の余裕） */

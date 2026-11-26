@@ -76,7 +76,7 @@ export default function SettingsEditor({ initial }: { initial: Settings }) {
             <input type="email" value={s.hostEmail} placeholder="例：matsumoto@example.com" onChange={(e) => up((d) => void (d.hostEmail = e.target.value))} />
           </label>
         </div>
-        <p className="muted small">メールアドレスを入れると、予約が入るたびに担当者にもGoogleカレンダーの招待が届き、担当者のカレンダーに予定が入ります。担当者のカレンダーが連携アカウントに共有されていれば、その予定がある時間も予約できなくなります。</p>
+        <p className="muted small">メールアドレスを入れると、<b>空き時間はこの担当者のカレンダーだけで判定</b>します（連携アカウントの他の予定は見ません。この予約アプリで入った予約どうしは重なりません）。予約が入るたびに担当者にもGoogleカレンダーの招待が届きます。担当者のカレンダーは、連携アカウントに「すべての予定の詳細」で共有しておいてください。</p>
       </section>
 
       <section className="card pad">
@@ -99,7 +99,7 @@ export default function SettingsEditor({ initial }: { initial: Settings }) {
         </div>
         {s.availabilityMode === "keyword" ? (
           <p className="muted small">
-            連携しているGoogleカレンダーで、題名に「{s.availabilityKeyword || "伏見"}」が入った予定の時間だけ予約できます（例：「伏見 10:00〜18:00」）。その時間帯でも、同じカレンダーにほかの予定が入っているところは予約できません。終日の「{s.availabilityKeyword || "伏見"}」予定の日は、下の曜日ごとの受付時間（未設定の曜日は10:00〜19:00）で受け付けます。
+            {s.hostEmail ? "担当者のカレンダー" : "連携しているGoogleカレンダー"}で、題名に「{s.availabilityKeyword || "伏見"}」が入った予定の時間だけ予約できます（例：「伏見 10:00〜18:00」）。その時間帯でも、同じカレンダーにほかの予定が入っているところは予約できません。終日の「{s.availabilityKeyword || "伏見"}」予定の日は、下の曜日ごとの受付時間（未設定の曜日は10:00〜19:00）で受け付けます。
           </p>
         ) : (
           <p className="muted small">曜日ごとに受け付ける時間帯。「＋時間帯」で昼休みを分けるなど複数設定できます。Googleカレンダーに予定がある時間は予約できません。</p>
