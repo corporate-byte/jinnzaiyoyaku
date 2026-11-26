@@ -9,6 +9,8 @@ export type Settings = {
   teamName: string;
   hostName: string;
   hostEmail: string;
+  availabilityMode: "weekly" | "keyword"; // weekly=曜日ごとの受付時間 / keyword=カレンダーのキーワード予定の時間だけ
+  availabilityKeyword: string;
   timeZone: string;
   weeklyHours: Hours;
   blockedDates: string[];
@@ -22,6 +24,8 @@ function fromDefaults(): Settings {
     teamName: defaults.teamName,
     hostName: defaults.hostName,
     hostEmail: defaults.hostEmail,
+    availabilityMode: "weekly" as Settings["availabilityMode"],
+    availabilityKeyword: "伏見",
     timeZone: defaults.timeZone,
     weeklyHours: structuredClone(defaults.weeklyHours),
     blockedDates: [...defaults.blockedDates],
@@ -34,7 +38,7 @@ export async function getSettings(): Promise<Settings> {
   const c = g.__settingsCache;
   if (c && Date.now() - c.at < 5000) return c.v; // 同じリクエスト内の多重読み込みを避ける短いキャッシュ
   const v = await rpc<Settings | null>("booking_get_settings");
-  const s = v && v.eventTypes ? { ...v, hostName: v.hostName ?? "", hostEmail: v.hostEmail ?? "" } : fromDefaults();
+  const s = v && v.eventTypes ? { ...v, hostName: v.hostName ?? "", hostEmail: v.hostEmail ?? "", availabilityMode: (v.availabilityMode === "keyword" ? "keyword" : "weekly") as Settings["availabilityMode"], availabilityKeyword: v.availabilityKeyword || "伏見" } : fromDefaults();
   g.__settingsCache = { at: Date.now(), v: s };
   return s;
 }
@@ -137,6 +141,8 @@ export function validateSettings(input: unknown): Settings {
     teamName: str(x.teamName, 100, "チーム名"),
     hostName: str(x.hostName, 50, "担当者名", false),
     hostEmail: hostEmail.slice(0, 200),
+    availabilityMode: (x.availabilityMode === "keyword" ? "keyword" : "weekly") as Settings["availabilityMode"],
+    availabilityKeyword: x.availabilityMode === "keyword" ? str(x.availabilityKeyword, 30, "受付に使うキーワード") : String(x.availabilityKeyword ?? "伏見").trim().slice(0, 30) || "伏見",
     timeZone: "Asia/Tokyo",
     weeklyHours,
     blockedDates,

@@ -138,6 +138,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <h3>担当者</h3>
         <p>{config.hostName || <span className="muted">未設定</span>}{config.hostEmail && <span className="muted">（{config.hostEmail}）</span>}</p>
         <h3>受付時間</h3>
+        {config.availabilityMode === "keyword" && (
+          <p className="small"><b>Googleカレンダーに「{config.availabilityKeyword}」と入っている予定の時間だけ</b>受け付けます（同じカレンダーの他の予定とは重ならないようにします）。下は終日の「{config.availabilityKeyword}」の日に使う時間です。</p>
+        )}
         <ul className="hours">
           {[1, 2, 3, 4, 5, 6, 0].map((w) => {
             const hs = config.weeklyHours[w as 0];

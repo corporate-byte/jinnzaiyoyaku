@@ -81,7 +81,29 @@ export default function SettingsEditor({ initial }: { initial: Settings }) {
 
       <section className="card pad">
         <h2>受付時間</h2>
-        <p className="muted small">曜日ごとに受け付ける時間帯。「＋時間帯」で昼休みを分けるなど複数設定できます。</p>
+        <div className="mode-pick">
+          <label className="field field-check">
+            <input type="radio" name="am" checked={s.availabilityMode !== "keyword"} onChange={() => up((d) => void (d.availabilityMode = "weekly"))} />
+            曜日ごとの受付時間で受け付ける
+          </label>
+          <label className="field field-check">
+            <input type="radio" name="am" checked={s.availabilityMode === "keyword"} onChange={() => up((d) => void (d.availabilityMode = "keyword"))} />
+            Googleカレンダーに
+            <input
+              className="kw"
+              value={s.availabilityKeyword}
+              onChange={(e) => up((d) => void ((d.availabilityKeyword = e.target.value), (d.availabilityMode = "keyword")))}
+            />
+            と入っている予定の時間だけ受け付ける
+          </label>
+        </div>
+        {s.availabilityMode === "keyword" ? (
+          <p className="muted small">
+            連携しているGoogleカレンダーで、題名に「{s.availabilityKeyword || "伏見"}」が入った予定の時間だけ予約できます（例：「伏見 10:00〜18:00」）。その時間帯でも、同じカレンダーにほかの予定が入っているところは予約できません。終日の「{s.availabilityKeyword || "伏見"}」予定の日は、下の曜日ごとの受付時間（未設定の曜日は10:00〜19:00）で受け付けます。
+          </p>
+        ) : (
+          <p className="muted small">曜日ごとに受け付ける時間帯。「＋時間帯」で昼休みを分けるなど複数設定できます。Googleカレンダーに予定がある時間は予約できません。</p>
+        )}
         <div className="hours-edit">
           {DAYS.map((w) => {
             const list = s.weeklyHours[w];

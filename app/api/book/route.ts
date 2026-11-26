@@ -3,7 +3,9 @@ import { config } from "@/config/booking.config.ts";
 import { findMenu, getSettings, rulesOf } from "@/lib/settings.ts";
 import { recordBooking } from "@/lib/bookingsDb.ts";
 import { notifyLine } from "@/lib/line.ts";
-import { createEvent, getBusy, newEventId } from "@/lib/google.ts";
+import { createEvent, newEventId } from "@/lib/google.ts";
+import { getAvailability, rangeFor } from "@/lib/availability.ts";
+import { localDateStr } from "@/lib/time.ts";
 import { isSlotAvailable } from "@/lib/slots.ts";
 import { sign } from "@/lib/sign.ts";
 import { formatJa } from "@/lib/time.ts";
@@ -30,9 +32,10 @@ export async function POST(req: NextRequest) {
 
   const end = new Date(start.getTime() + ev.durationMinutes * 60000);
   try {
-    const pad = Math.max(ev.bufferBeforeMinutes, ev.bufferAfterMinutes) * 60000 + 3600000;
-    const busy = await getBusy(config.busyCalendars, new Date(start.getTime() - pad), new Date(end.getTime() + pad), s.hostEmail ? [s.hostEmail] : []);
-    if (!isSlotAvailable(ev, rulesOf(s), busy, start.toISOString())) {
+    const day = localDateStr(start, s.timeZone);
+    const [min, max] = rangeFor(day, day, s.timeZone);
+    const av = await getAvailability(s, min, max);
+    if (!isSlotAvailable(ev, rulesOf(s), av.busy, start.toISOString(), new Date(), av.windows)) {
       return NextResponse.json({ error: "この時間はすでに埋まっています。別の時間を選んでください。" }, { status: 409 });
     }
 

@@ -106,6 +106,45 @@ export async function getBusy(calendars: string[], timeMin: Date, timeMax: Date,
   return out;
 }
 
+export type CalEvent = { summary: string; start: Date; end: Date; allDay: boolean; startDate?: string; endDate?: string; busy: boolean; mine: boolean };
+
+/** カレンダーの予定を（題名つきで）取得。mine = この予約アプリが作った予定 */
+export async function listEvents(calendarId: string, timeMin: Date, timeMax: Date): Promise<CalEvent[]> {
+  if (await isMock()) {
+    return mockEvents
+      .filter((e) => e.end > timeMin && e.start < timeMax)
+      .map((e) => ({ summary: e.summary, start: e.start, end: e.end, allDay: false, busy: true, mine: !!e.meta?.slug || e.id.startsWith("bk") }));
+  }
+  const out: CalEvent[] = [];
+  let pageToken = "";
+  do {
+    const q = new URLSearchParams({ timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "250" });
+    if (pageToken) q.set("pageToken", pageToken);
+    const res = await gfetch(`/calendars/${encodeURIComponent(calendarId)}/events?${q}`);
+    if (!res.ok) throw new Error(`events.list failed: ${res.status} ${await res.text()}`);
+    const j = await res.json();
+    for (const e of j.items ?? []) {
+      if (e.status === "cancelled") continue;
+      // 自分が「不参加」にした招待は予定として数えない
+      const me = (e.attendees ?? []).find((a: { self?: boolean }) => a.self);
+      if (me && me.responseStatus === "declined") continue;
+      const allDay = !!e.start?.date;
+      out.push({
+        summary: String(e.summary ?? ""),
+        start: new Date(e.start?.dateTime ?? e.start?.date),
+        end: new Date(e.end?.dateTime ?? e.end?.date),
+        allDay,
+        startDate: e.start?.date,
+        endDate: e.end?.date,
+        busy: e.transparency !== "transparent",
+        mine: e.extendedProperties?.private?.bookingApp === "1",
+      });
+    }
+    pageToken = j.nextPageToken ?? "";
+  } while (pageToken);
+  return out;
+}
+
 export type CreatedEvent = { id: string; htmlLink?: string; meetUrl?: string };
 
 export async function createEvent(input: {
